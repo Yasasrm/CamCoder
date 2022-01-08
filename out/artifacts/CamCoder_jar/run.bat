@@ -1,0 +1,1 @@
+"C:\Program Files\Java\jdk1.8.0_261\bin\java.exe" -Dfile.encoding=windows-1252 -jar "F:\Projects\Intelij Projects\CamCoder\out\artifacts\CamCoder_jar\CamCoder.jar"
