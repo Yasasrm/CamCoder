@@ -72,9 +72,9 @@ public class LoginModule {
         IntByReference errorCode = new IntByReference(0);
         loginHandle = netsdk.CLIENT_LoginEx2(ip, port, username, password, 0, null, deviceInfo, errorCode);
         if (loginHandle.longValue() == 0)
-            System.err.println("login error!");
+            System.err.println("Error occurred while connecting to the camera!");
         else
-            System.out.println("login success!");
+            System.out.println("Successfully connected to the camera..");
         return loginHandle.longValue() == 0 ? false : true;
     }
 
