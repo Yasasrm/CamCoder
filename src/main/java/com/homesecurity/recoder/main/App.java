@@ -6,7 +6,6 @@ import com.homesecurity.recoder.module.LoginModule;
 import com.homesecurity.recoder.module.PlayModule;
 import com.sun.jna.Pointer;
 
-import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -15,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.Properties;
 import java.util.Scanner;
 
@@ -26,40 +26,46 @@ public class App {
 
     public static void main(String[] args) {
         try {
-        boolean run = programConfig();
-        FileReader reader = new FileReader("configuration.properties");
-        Properties p = new Properties();
-        p.load(reader);
-        String camIp = p.getProperty("ip");
-        int camPort = Integer.parseInt(p.getProperty("port"));
-        String camUser = p.getProperty("user");
-        String camPassword = p.getProperty("pass");
-        String vdoPath = p.getProperty("path");
-        while (run) {
-                LocalDateTime ldt = LocalDateTime.now();
-                String timeSubFldr = DateTimeFormatter.ofPattern("HH").format(ldt);
-                String timeFldr = DateTimeFormatter.ofPattern("yyyy-MM-dd").format(ldt);
-                String time = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH.mm.ss").format(ldt);
-                createIfNotExist(vdoPath,timeFldr, timeSubFldr);
-                LLong playHandle = null;
+            boolean run = programConfig();
+            FileReader reader = new FileReader("configuration.properties");
+            Properties p = new Properties();
+            p.load(reader);
+            String camIp = p.getProperty("ip");
+            int camPort = Integer.parseInt(p.getProperty("port"));
+            String camUser = p.getProperty("user");
+            String camPassword = p.getProperty("pass");
+            String vdoPath = p.getProperty("path");
+            int sec = Integer.parseInt(p.getProperty("sec"));
+            PlayModule playModule = new PlayModule();
+            while (run) {
                 System.out.println(LoginModule.init(DisConnectCallBack.getInstance(), HaveReConnectCallBack.getInstance()) ? "Initialization Success!" : "Initialization Failed!");
                 LoginModule.login(camIp, camPort, camUser, camPassword);
-                System.out.println("Recording["+time+"]");
-                for (int i = 0; i < 5000; i++) {
-                    System.out.print(".");
-                    String output = vdoPath+"\\"+timeFldr+"\\"+timeSubFldr+"\\video_"+j+""+(i==0?".dav":"_dat");
-                    playHandle = PlayModule.startRealPlay(0, 0, output);
-                    if (playHandle.longValue() == 0) {
-                        LoginModule.logout();
-                        LoginModule.cleanup();
-                        File file = new File(vdoPath+"\\"+timeFldr+"\\"+timeSubFldr+"\\video_"+j+"_dat");
-                        boolean result = Files.deleteIfExists(file.toPath());
-                        break;
+                LLong playHandle = playModule.startRealPlay(0, 0);
+                while (playHandle.longValue() != 0) {
+                    LocalDateTime ldt = LocalDateTime.now();
+                    String timeSubFldr = DateTimeFormatter.ofPattern("HH").format(ldt);
+                    String timeFldr = DateTimeFormatter.ofPattern("yyyy-MM-dd").format(ldt);
+                    String time = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH.mm.ss").format(ldt);
+                    System.out.print("Recording Started : ["+time+"]");
+                    createIfNotExist(vdoPath, timeFldr, timeSubFldr);
+                    String output = vdoPath + "\\" + timeFldr + "\\" + timeSubFldr + "\\video_" + j + ".dav";
+
+                    Date d1 = new Date();
+                    while (getSecondsPass(d1,new Date()) < sec) {
+                        playModule.saveVideo(playHandle, output);
                     }
+                    System.out.println();
+                    playModule.stopSaveVideo(playHandle);
+                    System.out.println("Video Saved : ["+output+"]");
+                    j++;
                 }
-                j++;
+                if (playHandle.longValue() == 0) {
+                    LoginModule.logout();
+                    LoginModule.cleanup();
+                    break;
+                }
                 Thread.sleep(1000);
-        }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -80,12 +86,15 @@ public class App {
             String pass = sc.nextLine().trim();
             System.out.println("Please enter path to save videos:");
             String path = sc.nextLine().trim();
+            System.out.println("Please enter video length (Seconds):");
+            String sec = sc.nextLine().trim();
             Properties p = new Properties();
             p.setProperty("ip", ip);
             p.setProperty("port", port);
             p.setProperty("user", user);
             p.setProperty("pass", pass);
             p.setProperty("path", path);
+            p.setProperty("sec", sec);
             try {
                 p.store(new FileWriter("configuration.properties"), "CCTV Camera Configurations");
             } catch (IOException e) {
@@ -98,10 +107,10 @@ public class App {
 
     private static void createIfNotExist(String vdoPath, String timeFldr, String timeSubFldr) throws IOException {
         Path path1 = Paths.get(vdoPath);
-        Path path2 = Paths.get(vdoPath+"\\"+timeFldr);
-        Path path3 = Paths.get(vdoPath+"\\"+timeFldr+"\\"+timeSubFldr);
+        Path path2 = Paths.get(vdoPath + "\\" + timeFldr);
+        Path path3 = Paths.get(vdoPath + "\\" + timeFldr + "\\" + timeSubFldr);
         if (!Files.exists(path3)) {
-            j=0;
+            j = 0;
         }
         Files.createDirectories(path1);
         Files.createDirectories(path2);
@@ -142,5 +151,10 @@ public class App {
         public void invoke(NetSDKLib.LLong m_hLoginHandle, String pchDVRIP, int nDVRPort, Pointer dwUser) {
             System.out.printf("ReConnect Device[%s] Port[%d]\n", pchDVRIP, nDVRPort);
         }
+
+    }
+
+    private static int getSecondsPass(Date d1, Date d2){
+        return (int)(d2.getTime()-d1.getTime())/1000;
     }
 }
